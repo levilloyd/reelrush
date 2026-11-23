@@ -43,6 +43,7 @@ final class MapScene: BaseScene {
     private var wakeTimer = 0.0
     private(set) var inBoat = false
     private var moored = false
+    private var boatOnTrailer = true   // false once launched, until loaded back onto the trailer
     private var carNode: CarNode?
     private var driving = false
     private var carVel = CGVector.zero
@@ -156,6 +157,7 @@ final class MapScene: BaseScene {
             let old = carNode?.position
             carNode?.removeFromParent()
             let n = CarNode(car: car)
+            n.boatAboard = boatOnTrailer
             let garage = world.building(.garage).door
             n.position = old ?? CGPoint(x: garage.x, y: garage.y - 40)
             addChild(n)
@@ -670,6 +672,11 @@ final class MapScene: BaseScene {
         if let problem = save.towProblem { toast(problem); Sound.play("Funk", volume: 0.3); return }
         guard driving else { toast("DRIVE YOUR CAR (C) TO THE WATER TO LAUNCH YOUR BOAT"); return }
         guard let boat = save.boat, let h = facingHabitat else { return }
+        guard boatOnTrailer else {
+            toast("YOUR \(boat.name.uppercased()) IS STILL ON THE WATER.\nDRIVE UP TO IT AND PRESS E TO LOAD IT,\nOR RE-HITCH IT AT THE BOAT SHED.")
+            Sound.play("Funk", volume: 0.3)
+            return
+        }
         guard boat.waters.contains(h) else {
             toast("YOUR \(boat.name.uppercased()) CAN'T HANDLE THE \(h.displayName.uppercased())!")
             Sound.play("Funk", volume: 0.3)
@@ -691,7 +698,33 @@ final class MapScene: BaseScene {
         boatNode = makeBoat(boat, at: spot)
         boatNode?.setDir(carNode?.dir ?? playerDir, force: true)
         boatVel = .zero
+        boatOnTrailer = false
+        carNode?.boatAboard = false
         Sound.play("Bottle", volume: 0.35)
+    }
+
+    private func mooredBoatInReach(of car: CarNode) -> Bool {
+        guard moored, !boatOnTrailer, let b = boatNode else { return false }
+        return hypot(b.position.x - car.position.x, b.position.y - car.position.y) < 150
+    }
+
+    /// Winch a moored boat back onto the car's trailer.
+    private func loadBoat() {
+        let save = Game.shared.save
+        if let problem = save.towProblem { toast(problem); Sound.play("Funk", volume: 0.3); return }
+        returnBoatToTrailer()
+        Sound.play("Bottle", volume: 0.35)
+        toast("\(save.boat?.name.uppercased() ?? "BOAT") LOADED ONTO THE TRAILER!")
+    }
+
+    /// Puts the hitched boat back on the trailer (also used when re-hitching at the boat shed).
+    func returnBoatToTrailer() {
+        guard !inBoat else { return }
+        boatNode?.removeFromParent()
+        boatNode = nil
+        moored = false
+        boatOnTrailer = true
+        carNode?.boatAboard = true
     }
 
     private func goAshore() {
@@ -1067,6 +1100,11 @@ final class MapScene: BaseScene {
         if driving, let node = carNode {
             let v = dirVector(node.dir)
             var parts = ["C: GET OUT"]
+            if mooredBoatInReach(of: node) {
+                parts.append(save.towProblem ?? "E: LOAD \(save.boat?.name.uppercased() ?? "BOAT") ONTO TRAILER")
+                setPrompt(parts.joined(separator: "    "))
+                return
+            }
             for dist in [44.0, 64.0] as [CGFloat] {
                 let p = CGPoint(x: node.position.x + v.dx * dist, y: node.position.y + 10 + v.dy * dist)
                 if let h = world.tile(at: p).habitat {
@@ -1460,6 +1498,7 @@ final class MapScene: BaseScene {
                 boatVel = .zero
                 Sound.play("Bottle", volume: 0.35)
             }
+            else if driving, let car = carNode, mooredBoatInReach(of: car) { loadBoat() }
             else if facingHabitat != nil { launchBoat() }
         case Key.c:
             if !inBoat { toggleCar() }
@@ -1483,13 +1522,41 @@ final class MapScene: BaseScene {
     func placeAtHome() { placeAt(world.houseDoor) }
 
     func debugWalk(to p: CGPoint, facing d: Dir) {
-        inBoat = false
-        boatNode?.removeFromParent()
-        boatNode = nil
+        // A moored boat stays where it was left; if we were aboard, the boat goes back on the trailer.
+        if inBoat || !moored {
+            inBoat = false
+            returnBoatToTrailer()
+        }
         player.isHidden = false
         player.position = p
         playerDir = d
         updateCamera()
+    }
+
+    /// Snapshot helper: moor the boat on a lake and park the car (empty trailer) on the shore beside it.
+    func debugMooredAtShore(_ h: Habitat) {
+        guard let boat = Game.shared.save.boat, Game.shared.save.activeCar != nil else { return }
+        for (x, y) in schoolSpots where world[x, y] == .water(h) {
+            let p = world.center(x, y)
+            guard boatFits(p, boat) else { continue }
+            for off in [CGPoint(x: 0, y: -100), CGPoint(x: 0, y: 100), CGPoint(x: -100, y: 0), CGPoint(x: 100, y: 0)] {
+                let cp = CGPoint(x: p.x + off.x, y: p.y + off.y)
+                guard carFits(cp) else { continue }
+                inBoat = false; moored = true; boatOnTrailer = false
+                boatNode?.removeFromParent()
+                boatNode = makeBoat(boat, at: p)
+                carNode?.removeFromParent(); carNode = nil
+                syncCar()
+                carNode?.position = cp
+                carNode?.setDir(off.x == 0 ? (off.y < 0 ? .up : .down) : (off.x < 0 ? .right : .left), force: true)
+                carNode?.zPosition = depth(cp.y)
+                driving = true
+                player.isHidden = true
+                player.position = cp
+                updateCamera()
+                return
+            }
+        }
     }
 
     /// Snapshot helper: fill the water around the boat with schools.
@@ -1513,6 +1580,9 @@ final class MapScene: BaseScene {
             let p = world.center(x, y)
             guard boatFits(p, boat) else { continue }
             inBoat = true
+            moored = false
+            boatOnTrailer = false
+            carNode?.boatAboard = false
             player.isHidden = true
             boatNode?.removeFromParent()
             boatNode = makeBoat(boat, at: p)

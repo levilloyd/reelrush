@@ -20,6 +20,7 @@ A huge Stardew-style world (280×190 tiles): your **home, farm, boat shed and wo
   - **Rods:** all-rounders (Twig → Legendary) plus specialists (Fly, Surf Caster, Deep Sea, Bayou Baitcaster, Ice) that are great in their waters and weaker elsewhere. Switch rods with **G** → ROD.
   - **Sharks:** eight sharks (Blacktip, Lemon, Leopard, Mako, Goblin, Whitetip, Tiger and the legendary Great White) roam the salt waters, but they only bite when a salt-water rod (Surf Caster or Deep Sea Rod) is equipped.
   - **Build your home base:** the **boat shed** (40 timber + 30 stone) and the **garage** (30 timber + 50 stone) start as empty plots by your house. Walk up and press SPACE to build them. You need the boat shed before you can buy boats and the garage before you can buy cars. Cars park at the garage, and pressing SPACE there switches between the cars you own.
+  - **Trailering:** once you go ashore (E), your boat stays moored and your car tows an empty trailer. Drive up next to the moored boat and press **E** to load it back onto the trailer. Re-hitching a boat at the boat shed also brings it home.
   - **Fish Finder (1200G, Bait & Tackle → Boats):** sonar fitted to all your boats. While you're out on the water it shows fish schools around you (yellow = water your boat can reach) and the distance and direction to the nearest one.
   - **Books:** buy the bookshelf (Home Goods). Each book lists a water's fish with your live % chance of catching each one, and reading it gives a permanent fishing bonus.
 - **Boats, cars & trailers:**

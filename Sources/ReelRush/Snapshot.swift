@@ -47,6 +47,13 @@ func runSnapshots(view: SKView, dir: String) {
         game.save.boatsOwned = ["yacht"]; game.save.hitched = "yacht"
         present(game.mapScene); game.mapScene.debugBoard(.ocean); game.mapScene.debugSchoolsNearBoat()
     }))
+    steps.append(("37_moored_trailer", {
+        setTime(14, .sunny)
+        game.save.boatsOwned = ["skiff"]; game.save.hitched = "skiff"
+        game.save.carsOwned = ["car.truck"]; game.save.car = "car.truck"; game.save.trailers = ["trailer.big"]
+        present(game.mapScene); game.mapScene.debugMooredAtShore(.lake)
+    }))
+    steps.append(("38_loaded_trailer", { game.mapScene.keyPressed(Key.e) }))
     steps.append(("35_home_sites", {
         setTime(11, .sunny); game.save.boatShedBuilt = false; game.save.garageBuilt = false
         game.save.add("timber", 12); game.save.add("stone", 8)

@@ -1354,6 +1354,8 @@ final class CarNode: SKNode {
     private let trailer = SKSpriteNode()
     private let cargo = SKSpriteNode()
     private(set) var dir: Dir = .right
+    /// False while the hitched boat is out on the water; the trailer is then towed empty.
+    var boatAboard = true { didSet { if boatAboard != oldValue { setDir(dir, force: true) } } }
 
     init(car: Car) {
         self.car = car
@@ -1386,7 +1388,7 @@ final class CarNode: SKNode {
         }
         if d == .left || d == .right { body.yScale = 1 }
         trailer.isHidden = towing == nil
-        cargo.isHidden = towing == nil
+        cargo.isHidden = towing == nil || !boatAboard
         if let boat = towing {
             let back: CGFloat = d == .left ? 1 : (d == .right ? -1 : 0)
             let backY: CGFloat = d == .up ? -1 : (d == .down ? 1 : 0)
