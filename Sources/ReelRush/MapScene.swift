@@ -44,6 +44,8 @@ final class MapScene: BaseScene {
     private(set) var inBoat = false
     private var moored = false
     private var boatOnTrailer = true   // false once launched, until loaded back onto the trailer
+    /// Charter clients currently riding in your boat.
+    private(set) var partyAboard = false
     private var carNode: CarNode?
     private var driving = false
     private var carVel = CGVector.zero
@@ -131,6 +133,8 @@ final class MapScene: BaseScene {
         lastTime = 0
         player.setPixelTexture(PlayerArt.texture(playerDir, frame: 0), scale: 2)
         if let n = boatNode { n.setDir(n.dir, force: true) }
+        if partyAboard, let ch = Game.shared.save.charter, ch.day == Game.shared.save.day { if boatNode?.party.isEmpty == true { boatNode?.party = ch.party } }
+        else if partyAboard { partyAboard = false; boatNode?.party = [] }
         if let boat = Game.shared.save.boat, let node = boatNode, node.kind != boat.kind {
             let pos = node.position
             node.removeFromParent()
@@ -720,6 +724,28 @@ final class MapScene: BaseScene {
         boatOnTrailer = false
         carNode?.boatAboard = false
         Sound.play("Bottle", volume: 0.35)
+        boardCharterParty()
+    }
+
+    // MARK: Charter party
+
+    /// Today's charter clients climb aboard a charter-capable boat when you launch it.
+    private func boardCharterParty() {
+        let s = Game.shared.save
+        guard let ch = s.charter, ch.day == s.day, !ch.complete, let boat = s.boat, boat.charter else { return }
+        partyAboard = true
+        boatNode?.party = ch.party
+        toast("\(ch.client) CLIMBED ABOARD!\nHEAD FOR \(ch.water.spotName.uppercased()).")
+    }
+
+    /// Back on land: a finished charter's clients thank you and head home.
+    private func dropOffCharterParty() {
+        guard partyAboard else { return }
+        let s = Game.shared.save
+        guard let ch = s.charter, ch.complete || ch.day != s.day else { return }
+        partyAboard = false
+        boatNode?.party = []   // the charter stays on record for today, so it can't be booked again
+        toast("\(ch.client) HEADS HOME. THANKS FOR THE TRIP!")
     }
 
     private func mooredBoatInReach(of car: CarNode) -> Bool {
@@ -763,6 +789,10 @@ final class MapScene: BaseScene {
     /// Puts the hitched boat back on the trailer (also used when re-hitching at the boat shed).
     func returnBoatToTrailer() {
         guard !inBoat else { return }
+        if partyAboard {
+            dropOffCharterParty()
+            partyAboard = false   // an unfinished charter's clients wait on the dock for you to relaunch
+        }
         boatNode?.removeFromParent()
         boatNode = nil
         moored = false
@@ -779,6 +809,7 @@ final class MapScene: BaseScene {
         player.position = st.0
         playerDir = st.1
         Sound.play("Pop", volume: 0.3)
+        dropOffCharterParty()
     }
 
     private func updateBoat(_ dt: Double, _ ix: CGFloat, _ iy: CGFloat) {
@@ -1671,6 +1702,7 @@ final class MapScene: BaseScene {
             boatNode?.removeFromParent()
             boatNode = makeBoat(boat, at: p)
             boatNode?.setDir(.right, force: true)
+            boardCharterParty()
             updateCamera()
             return
         }

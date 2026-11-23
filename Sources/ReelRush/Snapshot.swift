@@ -63,6 +63,15 @@ func runSnapshots(view: SKView, dir: String) {
         game.save.coins = 500; game.save.boatsOwned = ["skiff", "yacht"]; game.save.fuel["yacht"] = 40
         present(ShopScene(kind: .gas))
     }))
+    steps.append(("43_charter_map", {
+        setTime(9, .sunny)
+        game.save.boatsOwned = ["yacht"]; game.save.hitched = "yacht"
+        game.save.charter = Charter(client: "THE KIM FAMILY", habitat: "lake", perFish: 100, bonus: 500, target: 5, caught: 2, day: game.save.day)
+        present(TitleScene(size: Game.sceneSize)); present(game.mapScene); game.mapScene.debugBoard(.lake)
+    }))
+    steps.append(("44_charter_fishing", {
+        present(FishingScene(habitat: .lake, boat: Boat.byID["yacht"], school: false))
+    }))
     steps.append(("42_gas_building", {
         present(game.mapScene); game.mapScene.keyPressed(Key.c)
         let g = game.mapScene.world.building(.gas).door

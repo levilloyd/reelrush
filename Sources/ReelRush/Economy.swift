@@ -401,6 +401,37 @@ struct Charter: Codable {
     }
 }
 
+extension Charter {
+    /// How many clients come along on the boat.
+    var partySize: Int {
+        switch client {
+        case "THE KIM FAMILY", "BACHELOR PARTY": return 3
+        case "TOURISTS FROM AFAR": return 2
+        default: return 1
+        }
+    }
+    var complete: Bool { caught >= target }
+    /// The clients' looks (stable for each client).
+    var party: [Outfit] { (0..<partySize).map { Charter.guest(client, $0) } }
+
+    static func guest(_ client: String, _ i: Int) -> Outfit {
+        let sid = client.unicodeScalars.reduce(0) { ($0 &* 31 &+ Int($1.value)) & 0xFFFF }
+        func pick<T>(_ a: [T], _ k: Int) -> T { a[Int(hrand(i, sid, k) * Double(a.count)) % a.count] }
+        let shirts: [UInt32] = [0xE85A5A, 0x3A8AE8, 0xF2C83A, 0x5AC87A, 0xE88A3A, 0xA85AE8, 0xF0F0F0, 0x2AB8B0]
+        let pants: [UInt32] = [0x2A3A5A, 0x5A4A3A, 0xC8B890, 0x3A3A44, 0x6A8A4A]
+        var hat: HatStyle = pick([.bucket, .straw, .cap, .beanie], 1)
+        var hatC: UInt32 = pick([0xF0E8D0, 0xC8A050, 0x3A6AE8, 0xE85A5A, 0x2A2A34], 2)
+        var shirt = pick(shirts, 3)
+        if client == "RETIRED ADMIRAL" { hat = .cap; hatC = 0xF4F4F4; shirt = 0x1A2A5A }
+        if client == "CEO MORGAN" { hat = .straw; shirt = 0x2A2A34 }
+        if client == "BACHELOR PARTY" && i == 0 { hat = .straw; hatC = 0xFFD23A }
+        let p = pick(pants, 4)
+        return Outfit(hatStyle: hat, hat: hatC, hatBand: PColor(hatC).shade(-0.3).hex, shirt: shirt, shirt2: PColor(shirt).shade(-0.25).hex,
+                      pattern: pick([.plain, .stripes, .floral, .plain], 5), pants: p, pants2: PColor(p).shade(-0.2).hex,
+                      shorts: hrand(i, sid, 6) < 0.4, hair: pick(GearItem.hairColors.prefix(5).map { $0 }, 7), skin: pick(GearItem.skinTones, 8))
+    }
+}
+
 extension Boat {
     /// Big boats can carry paying clients.
     var charter: Bool { big }

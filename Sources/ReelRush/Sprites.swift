@@ -452,6 +452,16 @@ final class BoatNode: SKNode {
     private let front = SKSpriteNode()
     private(set) var dir: Dir = .right
     private let scale: CGFloat
+    private var guests: [SKSpriteNode] = []
+    /// Charter clients riding along (drawn between the hull halves).
+    var party: [Outfit] = [] {
+        didSet {
+            guests.forEach { $0.removeFromParent() }
+            guests = party.map { _ in SKSpriteNode() }
+            for g in guests { insertChild(g, at: 1) }
+            setDir(dir, force: true)
+        }
+    }
 
     init(kind: BoatKind, scale: CGFloat = 2) {
         self.kind = kind
@@ -488,6 +498,11 @@ final class BoatNode: SKNode {
             rider.setPixelTexture(PlayerArt.texture(d, frame: 0), scale: scale)
             rider.anchorPoint = CGPoint(x: 0.5, y: 0)
             rider.position = CGPoint(x: (CGFloat(seat.0) - tw / 2) * scale * flip, y: -10 + CGFloat(seat.1) * scale)
+            for (i, g) in guests.enumerated() {
+                g.setPixelTexture(PlayerArt.texture(d, frame: 0, outfit: party[i]), scale: scale)
+                g.anchorPoint = CGPoint(x: 0.5, y: 0)
+                g.position = CGPoint(x: (CGFloat(seat.0 + 10 + i * 9) - tw / 2) * scale * flip, y: -10 + CGFloat(seat.1) * scale)
+            }
         case .up, .down:
             back.isHidden = false
             front.isHidden = true
@@ -499,6 +514,12 @@ final class BoatNode: SKNode {
             rider.setPixelTexture(PlayerArt.upperBody(d), scale: scale)
             rider.anchorPoint = CGPoint(x: 0.5, y: 0.5)
             rider.position = CGPoint(x: 0, y: d == .up ? -6 : 6)
+            for (i, g) in guests.enumerated() {
+                g.setPixelTexture(PlayerArt.upperBody(d, outfit: party[i]), scale: scale)
+                g.anchorPoint = CGPoint(x: 0.5, y: 0.5)
+                let col = CGFloat(i % 2 == 0 ? -1 : 1) * (i == 2 ? 0 : 9)
+                g.position = CGPoint(x: col * scale, y: (d == .up ? 12 : -12) * scale * (i == 2 ? 2 : 1))
+            }
         }
     }
 }

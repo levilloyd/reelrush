@@ -634,7 +634,7 @@ struct Car {
         Car(id: "car.pickup", name: "Old Pickup", price: 1200, speed: 430, tow: 1, body: 0x9A5A2A, blurb: "Rusty but trusty. Tows small trailers."),
         Car(id: "car.jeep", name: "Trail Jeep", price: 2500, speed: 470, tow: 1, body: 0x4E7A3A, blurb: "Fast on grass and dirt. Tows small trailers."),
         Car(id: "car.truck", name: "Big Truck", price: 4000, speed: 470, tow: 2, body: 0x2A5AA8, blurb: "Tows any trailer, even yachts."),
-        Car(id: "car.coupe", name: "Sports Coupe", price: 6000, speed: 680, tow: 0, body: 0xE83A3A, blurb: "Blazing fast. Can't tow anything."),
+        Car(id: "car.coupe", name: "Sports Coupe", price: 6000, speed: 980, tow: 0, body: 0xE83A3A, blurb: "Blazing fast. Can't tow anything."),
     ]
     static let byID: [String: Car] = Dictionary(uniqueKeysWithValues: all.map { ($0.id, $0) })
 }

@@ -517,6 +517,7 @@ final class FishingScene: BaseScene {
             let tw = BoatArt.side(boat.kind, front: false).size().width
             let seat = BoatArt.seat(boat.kind)
             feet = CGPoint(x: boatX - (tw / 2).rounded(.down) + CGFloat(seat.0), y: CGFloat(waterY) - 5 + CGFloat(seat.1))
+            addCharterGuests(boatLeft: boatX - (tw / 2).rounded(.down), deckY: CGFloat(waterY) - 5 + CGFloat(seat.1))
             playerSprite.run(.repeatForever(.sequence([.moveBy(x: 0, y: 4, duration: 0.9), .moveBy(x: 0, y: -4, duration: 0.9)])))
         } else {
             feet = CGPoint(x: 34, y: CGFloat(waterY) + 8)
@@ -529,6 +530,38 @@ final class FishingScene: BaseScene {
         hand = CGPoint(x: feet.x + 7, y: feet.y + 11)
         tipRest = CGPoint(x: hand.x + 34, y: hand.y + 44)
         tip = tipRest
+    }
+
+    // MARK: - Charter guests
+
+    private var guestSprites: [SKSpriteNode] = []
+
+    /// Charter clients stand on deck with their own rods.
+    private func addCharterGuests(boatLeft: CGFloat, deckY: CGFloat) {
+        let s = Game.shared.save
+        guard let b = boat, b.charter, Game.shared.mapScene.partyAboard, let ch = s.charter, ch.day == s.day else { return }
+        for (i, o) in ch.party.enumerated() {
+            let g = SKSpriteNode()
+            g.setPixelTexture(PlayerArt.texture(.right, frame: 0, outfit: o), scale: P)
+            g.anchorPoint = CGPoint(x: 0.5, y: 0)
+            let foot = CGPoint(x: boatLeft + 26 + CGFloat(i) * 9, y: deckY)
+            g.position = pt(foot)
+            g.zPosition = 5.5
+            addChild(g)
+            let rod = SKSpriteNode(color: PColor(0x3A2A1A).ns, size: CGSize(width: 26 * P, height: P))
+            rod.anchorPoint = CGPoint(x: 0, y: 0.5)
+            rod.position = CGPoint(x: 6 * P, y: 11 * P)
+            rod.zRotation = 0.9 + CGFloat(i) * 0.12
+            g.addChild(rod)
+            g.run(.repeatForever(.sequence([.moveBy(x: 0, y: 4, duration: 0.9), .moveBy(x: 0, y: -4, duration: 0.9)])))
+            guestSprites.append(g)
+        }
+    }
+
+    private func guestCheers() {
+        guard let g = guestSprites.randomElement() else { return }
+        g.run(.sequence([.moveBy(x: 0, y: 6 * P, duration: 0.15), .moveBy(x: 0, y: -6 * P, duration: 0.2),
+                         .moveBy(x: 0, y: 4 * P, duration: 0.12), .moveBy(x: 0, y: -4 * P, duration: 0.15)]))
     }
 
     // MARK: - UI
@@ -815,6 +848,7 @@ final class FishingScene: BaseScene {
             game.save.coins += pay
             game.save.charter = ch
             charterPay += pay
+            guestCheers()
         } else if game.save.cooler.count < game.save.coolerCapacity {
             game.save.cooler.append(c)
         }
