@@ -47,6 +47,20 @@ func runSnapshots(view: SKView, dir: String) {
         game.save.boatsOwned = ["yacht"]; game.save.hitched = "yacht"
         present(game.mapScene); game.mapScene.debugBoard(.ocean); game.mapScene.debugSchoolsNearBoat()
     }))
+    steps.append(("35_home_sites", {
+        setTime(11, .sunny); game.save.boatShedBuilt = false; game.save.garageBuilt = false
+        game.save.add("timber", 12); game.save.add("stone", 8)
+        present(game.mapScene)
+        let g = game.mapScene.world.building(.garage).door
+        game.mapScene.debugWalk(to: CGPoint(x: g.x, y: g.y - 20), facing: .up)
+    }))
+    steps.append(("36_home_built", {
+        game.save.boatShedBuilt = true; game.save.garageBuilt = true
+        game.save.carsOwned = ["car.truck", "car.coupe"]; game.save.car = "car.truck"
+        present(TitleScene(size: Game.sceneSize)); present(game.mapScene)
+        let g = game.mapScene.world.building(.garage).door
+        game.mapScene.debugWalk(to: CGPoint(x: g.x - 140, y: g.y - 30), facing: .up)
+    }))
     steps.append(("32_shark_hooked", {
         setTime(7, .sunny); game.save.rodsOwned = [0, 7]; game.save.rodLevel = 7
         let f = FishingScene(habitat: .deepSea, boat: Boat.byID["yacht"], school: false); present(f)

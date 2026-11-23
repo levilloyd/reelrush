@@ -976,6 +976,25 @@ enum GoodArt {
 }
 
 extension PropArt {
+    /// An unbuilt plot: stone foundation, a few timber posts and a sign.
+    static func buildSite() -> SKTexture {
+        Tex.get("bld.site") {
+            let b = PixelBuffer(68, 52)
+            b.rect(2, 0, 64, 2, PColor(0x000000, 60))
+            b.rect(4, 2, 60, 8, PColor(0x9A968E))
+            for x in stride(from: 4, to: 64, by: 8) { b.rect(x, 2, 1, 8, PColor(0x6A665E)) }
+            b.rect(4, 6, 60, 1, PColor(0x6A665E))
+            for x in [6, 30, 58] { b.rect(x, 10, 4, 28, PColor(0xA0703C)); b.rect(x + 3, 10, 1, 28, PColor(0x6A4422)) }
+            b.rect(6, 36, 56, 4, PColor(0xA0703C)); b.rect(6, 36, 56, 1, PColor(0x6A4422))
+            b.line(10, 12, 28, 34, PColor(0x8A5A30)); b.line(34, 34, 56, 12, PColor(0x8A5A30))
+            b.rect(40, 10, 10, 4, PColor(0xA0703C)); b.rect(42, 14, 8, 3, PColor(0x9A968E))
+            b.rect(18, 12, 2, 10, PColor(0x5A3418)); b.rect(7, 20, 27, 9, PColor(0xF2E8C8))
+            b.blit(PixelFont.render("BUILD", color: PColor(0xA83A2A), shadow: nil, align: .left), 9, 21)
+            b.outline(PColor(0x2A1408))
+            return b
+        }
+    }
+
     static func building(_ k: BuildingKind, variant: Int = 0) -> SKTexture {
         if k == .villa { return villa(variant) }
         switch k {
@@ -1034,6 +1053,17 @@ extension PropArt {
                 b.rect(6, 30, 40, 1, PColor(0xB07A40))
                 b.line(14, 2, 24, 10, PColor(0x5A5A64)); b.rect(30, 1, 8, 5, PColor(0x6A4A2A)); b.rect(31, 6, 2, 2, PColor(0x3A3A44)); b.rect(36, 6, 2, 2, PColor(0x3A3A44))
                 b.outline(PColor(0x1A1410))
+                return b
+            case .garage:
+                let b = PixelBuffer(68, 52)
+                b.rect(2, 0, 64, 2, PColor(0x000000, 60))
+                b.rect(4, 2, 60, 26, PColor(0xC8B8A0))
+                for y in stride(from: 4, to: 28, by: 4) { b.rect(4, y, 60, 1, PColor(0xA89880)) }
+                for row in 0..<22 { let inset = row * 10 / 22; b.rect(1 + inset, 28 + row, 66 - inset * 2, 1, row % 3 == 2 ? PColor(0x7A3A2A) : PColor(0xA85A3A)) }
+                b.rect(12, 2, 44, 20, PColor(0x5A5E66)); for y in stride(from: 4, to: 22, by: 3) { b.rect(12, y, 44, 1, PColor(0x7A7E86)) }
+                b.rect(12, 21, 44, 1, PColor(0x3A3E46))
+                b.rect(16, 22, 36, 6, PColor(0xF2E8C8)); b.blit(PixelFont.render("GARAGE", color: PColor(0xA83A2A), shadow: nil, align: .left), 17, 22)
+                b.outline(PColor(0x2A1408))
                 return b
             case .boatShed:
                 let b = PixelBuffer(68, 52)

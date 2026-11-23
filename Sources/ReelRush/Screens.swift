@@ -541,6 +541,7 @@ final class ShopScene: BaseScene {
                             detail: "\(b.watersLabel.uppercased()) · +\(Int(b.sizeBonus * 100))% SIZE · \(Int(b.extraChance * 100))% BONUS · COOLER \(b.capacity) · \(b.big ? "BIG: TRUCK + BIG TRAILER" : "SMALL TRAILER")") {
                     let game = Game.shared
                     guard !game.save.boatsOwned.contains(b.id) else { return ("ALREADY IN YOUR BOAT SHED.", false) }
+                    guard game.save.boatShedBuilt else { return ("BUILD YOUR BOAT SHED FIRST (\(Construction.costLabel(.boatShed))).", false) }
                     guard game.save.coins >= b.price else { return ("NEED \(b.price - game.save.coins)G MORE!", false) }
                     game.save.coins -= b.price
                     game.save.boatsOwned.append(b.id)
@@ -572,12 +573,13 @@ final class ShopScene: BaseScene {
                             detail: c.blurb.uppercased() + " · PRESS C NEAR IT TO DRIVE") {
                     let game = Game.shared
                     if !game.save.carsOwned.contains(c.id) {
+                        guard game.save.garageBuilt else { return ("BUILD YOUR GARAGE FIRST (\(Construction.costLabel(.garage))).", false) }
                         guard game.save.coins >= c.price else { return ("NEED \(c.price - game.save.coins)G MORE!", false) }
                         game.save.coins -= c.price
                         game.save.carsOwned.append(c.id)
                     }
                     game.save.car = c.id
-                    return ("THE \(c.name.uppercased()) IS PARKED AT YOUR BOAT SHED!", true)
+                    return ("THE \(c.name.uppercased()) IS PARKED AT YOUR GARAGE!", true)
                 }
             }
         case .trailers:

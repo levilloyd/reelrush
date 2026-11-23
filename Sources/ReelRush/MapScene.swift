@@ -73,6 +73,7 @@ final class MapScene: BaseScene {
     private let promptLabel = PixelLabel("", scale: 3)
     private let toastLabel = PixelLabel("", scale: 4, color: .gold)
     private let minimap = SKNode()
+    private var buildSprites: [BuildingKind: SKSpriteNode] = [:]   // boat shed & garage (site until built)
     // Fish finder (sonar shown while out in a boat)
     private let finder = SKNode()
     private let finderSweep = SKSpriteNode()
@@ -132,6 +133,7 @@ final class MapScene: BaseScene {
         }
         for key in Game.shared.save.plots.keys { refreshPlot(key) }
         closeDialog()
+        for (k, s) in buildSprites { s.setPixelTexture(Game.shared.save.isBuilt(k) ? PropArt.building(k) : PropArt.buildSite(), scale: 2) }
         syncCar()
         refreshHUD()
         showNews()
@@ -154,8 +156,8 @@ final class MapScene: BaseScene {
             let old = carNode?.position
             carNode?.removeFromParent()
             let n = CarNode(car: car)
-            let shed = world.building(.boatShed).door
-            n.position = old ?? CGPoint(x: shed.x, y: shed.y - 40)
+            let garage = world.building(.garage).door
+            n.position = old ?? CGPoint(x: garage.x, y: garage.y - 40)
             addChild(n)
             carNode = n
         }
@@ -196,7 +198,9 @@ final class MapScene: BaseScene {
         }
 
         for b in world.buildings {
-            let s = pixelSprite(PropArt.building(b.kind, variant: b.variant), scale: 2)
+            let built = Game.shared.save.isBuilt(b.kind)
+            let s = pixelSprite(built ? PropArt.building(b.kind, variant: b.variant) : PropArt.buildSite(), scale: 2)
+            if Construction.costs[b.kind] != nil { buildSprites[b.kind] = s }
             s.anchorPoint = CGPoint(x: 0.5, y: 0)
             s.position = CGPoint(x: b.door.x, y: b.door.y - (b.kind == .mine ? 0 : 4))
             s.zPosition = depth(s.position.y)
@@ -207,7 +211,7 @@ final class MapScene: BaseScene {
                 }
             }
             let names: [BuildingKind: String] = [.tackle: "BAIT & TACKLE", .general: "HARDWARE", .cottageA: "BOUTIQUE", .cottageB: "MARKET", .cottageC: "HOME GOODS",
-                                                 .house: "HOME", .mine: "MINE", .shed: "WORKSHOP", .boatShed: "BOAT SHED", .autos: "AUTO SHOP"]
+                                                 .house: "HOME", .mine: "MINE", .shed: "WORKSHOP", .boatShed: "BOAT SHED", .autos: "AUTO SHOP", .garage: "GARAGE"]
             if let n = names[b.kind] {
                 let l = PixelLabel(n, scale: 2, color: .gold)
                 l.position = CGPoint(x: s.position.x, y: s.position.y + s.size.height + 14)
@@ -761,6 +765,38 @@ final class MapScene: BaseScene {
         schools.append(s)
     }
 
+    // MARK: Construction
+
+    private func construct(_ k: BuildingKind) {
+        guard let cost = Construction.costs[k] else { return }
+        let game = Game.shared
+        let t = game.save.count("timber"), st = game.save.count("stone")
+        guard t >= cost.timber, st >= cost.stone else {
+            toast("TO BUILD THE \(Construction.name(k)) YOU NEED \(Construction.costLabel(k)).\nYOU HAVE \(t) TIMBER + \(st) STONE.")
+            Sound.play("Funk", volume: 0.3)
+            return
+        }
+        game.save.take("timber", cost.timber)
+        game.save.take("stone", cost.stone)
+        if k == .boatShed { game.save.boatShedBuilt = true } else { game.save.garageBuilt = true }
+        game.save.persist()
+        buildSprites[k]?.setPixelTexture(PropArt.building(k), scale: 2)
+        Sound.play("Glass", volume: 0.5)
+        toast(k == .garage ? "YOU BUILT A GARAGE! BUY CARS AT THE AUTO SHOP." : "YOU BUILT A BOAT SHED! BUY BOATS AT BAIT & TACKLE.")
+        refreshHUD()
+    }
+
+    private func switchCar() {
+        let s = Game.shared.save
+        guard !s.carsOwned.isEmpty else { toast("YOUR GARAGE IS EMPTY.\nBUY A CAR AT THE AUTO SHOP!"); return }
+        let i = s.car.flatMap { s.carsOwned.firstIndex(of: $0) } ?? -1
+        let next = s.carsOwned[(i + 1) % s.carsOwned.count]
+        Game.shared.save.car = next
+        carNode?.removeFromParent(); carNode = nil
+        syncCar()
+        toast("NOW DRIVING: \(Car.byID[next]?.name.uppercased() ?? "")")
+    }
+
     // MARK: Fish finder
 
     private func buildFinder(above mini: CGPoint, mapHeight mh: CGFloat) {
@@ -1054,7 +1090,18 @@ final class MapScene: BaseScene {
                                                  .cottageB: "ENTER MARKET (SEEDS & FOOD)", .cottageC: "ENTER HOME GOODS (FURNITURE)",
                                                  .boatShed: "BOAT SHED (CHOOSE BOAT TO TOW)", .autos: "ENTER AUTO SHOP (CARS & TRAILERS)", .villa: "KNOCK ON THE DOOR", .house: "ENTER HOME", .mine: "ENTER THE MINE", .shed: "USE WORKSHOP (WELDING)"]
         for b in world.buildings {
-            guard let name = doorNames[b.kind], hypot(b.door.x - pp.x, b.door.y - pp.y) < 56 else { continue }
+            guard hypot(b.door.x - pp.x, b.door.y - pp.y) < 56 else { continue }
+            if !Game.shared.save.isBuilt(b.kind) {
+                action = .door(b.kind)
+                setPrompt("SPACE: BUILD \(Construction.name(b.kind)) (\(Construction.costLabel(b.kind)))")
+                return
+            }
+            var label = doorNames[b.kind]
+            if b.kind == .garage {
+                let cars = Game.shared.save.carsOwned
+                label = cars.count > 1 ? "GARAGE (SWITCH CAR)" : (cars.isEmpty ? "GARAGE (BUY CARS AT THE AUTO SHOP)" : "GARAGE")
+            }
+            guard let name = label else { continue }
             action = .door(b.kind)
             setPrompt("SPACE: \(name)")
             return
@@ -1381,8 +1428,10 @@ final class MapScene: BaseScene {
             case .chop(let k): chop(k)
             case .farm(let k): doFarm(k)
             case .door(let b):
+                if !Game.shared.save.isBuilt(b) { construct(b); return }
                 Sound.play("Pop")
                 switch b {
+                case .garage: switchCar()
                 case .tackle: Game.shared.showShop(.tackle)
                 case .general: Game.shared.showShop(.hardware)
                 case .cottageA: Game.shared.showShop(.boutique)

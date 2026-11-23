@@ -317,6 +317,19 @@ enum Tools {
     }
 }
 
+// MARK: - Construction
+
+/// Home buildings you build yourself from timber and stone.
+enum Construction {
+    static let costs: [BuildingKind: (timber: Int, stone: Int)] = [.boatShed: (40, 30), .garage: (30, 50)]
+
+    static func name(_ k: BuildingKind) -> String { k == .garage ? "GARAGE" : "BOAT SHED" }
+    static func costLabel(_ k: BuildingKind) -> String {
+        guard let c = costs[k] else { return "" }
+        return "\(c.timber) TIMBER + \(c.stone) STONE"
+    }
+}
+
 // MARK: - House decor
 
 struct Decor {
