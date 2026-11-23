@@ -54,6 +54,20 @@ func runSnapshots(view: SKView, dir: String) {
         present(game.mapScene); game.mapScene.debugMooredAtShore(.lake)
     }))
     steps.append(("38_loaded_trailer", { game.mapScene.keyPressed(Key.e) }))
+    steps.append(("39_boat_near_car", {
+        game.save.fuel["skiff"] = 5; game.save.fuel["car.truck"] = 60
+        present(TitleScene(size: Game.sceneSize)); present(game.mapScene); game.mapScene.debugMooredAtShore(.lake, aboard: true)
+    }))
+    steps.append(("40_loaded_from_water", { game.mapScene.keyPressed(Key.e) }))
+    steps.append(("41_gas_station", {
+        game.save.coins = 500; game.save.boatsOwned = ["skiff", "yacht"]; game.save.fuel["yacht"] = 40
+        present(ShopScene(kind: .gas))
+    }))
+    steps.append(("42_gas_building", {
+        present(game.mapScene); game.mapScene.keyPressed(Key.c)
+        let g = game.mapScene.world.building(.gas).door
+        game.mapScene.debugWalk(to: CGPoint(x: g.x, y: g.y - 20), facing: .up)
+    }))
     steps.append(("35_home_sites", {
         setTime(11, .sunny); game.save.boatShedBuilt = false; game.save.garageBuilt = false
         game.save.add("timber", 12); game.save.add("stone", 8)

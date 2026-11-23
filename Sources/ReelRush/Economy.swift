@@ -317,6 +317,23 @@ enum Tools {
     }
 }
 
+// MARK: - Fuel
+
+/// Every car and boat has a gas tank. Driving and sailing burn fuel by distance.
+enum Fuel {
+    static let pricePerLiter = 2
+    /// (tank size in liters, liters burned per tile travelled)
+    static let specs: [String: (tank: Double, burn: Double)] = [
+        "car.pickup": (40, 0.10), "car.jeep": (50, 0.12), "car.truck": (90, 0.18), "car.coupe": (45, 0.14),
+        "kayak": (8, 0.02), "row": (8, 0.02), "skiff": (40, 0.12), "bass": (60, 0.20),
+        "pontoon": (70, 0.16), "trawler": (160, 0.40), "yacht": (300, 0.75),
+    ]
+    static func tank(_ id: String) -> Double { specs[id]?.tank ?? 50 }
+    static func burn(_ id: String) -> Double { specs[id]?.burn ?? 0.12 }
+    /// Speed multiplier when the tank is empty: you can still crawl home.
+    static let emptyCrawl: CGFloat = 0.2
+}
+
 // MARK: - Construction
 
 /// Home buildings you build yourself from timber and stone.

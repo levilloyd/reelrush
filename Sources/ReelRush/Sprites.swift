@@ -1054,6 +1054,25 @@ extension PropArt {
                 b.line(14, 2, 24, 10, PColor(0x5A5A64)); b.rect(30, 1, 8, 5, PColor(0x6A4A2A)); b.rect(31, 6, 2, 2, PColor(0x3A3A44)); b.rect(36, 6, 2, 2, PColor(0x3A3A44))
                 b.outline(PColor(0x1A1410))
                 return b
+            case .gas:
+                let b = PixelBuffer(68, 52)
+                b.rect(2, 0, 64, 2, PColor(0x000000, 60))
+                // Kiosk at the back
+                b.rect(38, 2, 26, 26, PColor(0xE8E4DC)); b.rect(42, 8, 18, 10, PColor(0x9AD8F2)); b.rect(50, 8, 1, 10, PColor(0x5A5E66))
+                b.rect(36, 28, 30, 4, PColor(0xC83A2A))
+                // Canopy on posts
+                for x in [6, 30] { b.rect(x, 2, 3, 34, PColor(0xD8D8E0)) }
+                b.rect(2, 34, 36, 8, PColor(0xC83A2A)); b.rect(2, 38, 36, 2, PColor(0xF2F0E8))
+                b.blit(PixelFont.render("GAS", color: PColor(0xFFFFFF), shadow: nil, align: .left), 13, 34)
+                // Pumps
+                for x in [12, 22] {
+                    b.rect(x, 2, 6, 14, PColor(0xF2D23A)); b.rect(x + 1, 10, 4, 4, PColor(0x2A2A34))
+                    b.rect(x + 6, 6, 1, 8, PColor(0x2A2A34))
+                }
+                b.rect(54, 30, 10, 18, PColor(0x5A5E66)); b.rect(55, 38, 8, 9, PColor(0xF2E8C8))
+                b.blit(PixelFont.render("2G", color: PColor(0xC83A2A), shadow: nil, align: .left), 56, 40)
+                b.outline(PColor(0x1A1A20))
+                return b
             case .garage:
                 let b = PixelBuffer(68, 52)
                 b.rect(2, 0, 64, 2, PColor(0x000000, 60))
