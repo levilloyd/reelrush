@@ -317,6 +317,36 @@ enum Tools {
     }
 }
 
+// MARK: - Fuel
+
+/// Every car and boat has a gas tank. Driving and sailing burn fuel by distance.
+enum Fuel {
+    static let pricePerLiter = 2
+    /// (tank size in liters, liters burned per tile travelled)
+    static let specs: [String: (tank: Double, burn: Double)] = [
+        "car.pickup": (40, 0.10), "car.jeep": (50, 0.12), "car.truck": (90, 0.18), "car.coupe": (45, 0.14),
+        "kayak": (8, 0.02), "row": (8, 0.02), "skiff": (40, 0.12), "bass": (60, 0.20),
+        "pontoon": (70, 0.16), "trawler": (160, 0.40), "yacht": (300, 0.75),
+    ]
+    static func tank(_ id: String) -> Double { specs[id]?.tank ?? 50 }
+    static func burn(_ id: String) -> Double { specs[id]?.burn ?? 0.12 }
+    /// Speed multiplier when the tank is empty: you can still crawl home.
+    static let emptyCrawl: CGFloat = 0.2
+}
+
+// MARK: - Construction
+
+/// Home buildings you build yourself from timber and stone.
+enum Construction {
+    static let costs: [BuildingKind: (timber: Int, stone: Int)] = [.boatShed: (40, 30), .garage: (30, 50)]
+
+    static func name(_ k: BuildingKind) -> String { k == .garage ? "GARAGE" : "BOAT SHED" }
+    static func costLabel(_ k: BuildingKind) -> String {
+        guard let c = costs[k] else { return "" }
+        return "\(c.timber) TIMBER + \(c.stone) STONE"
+    }
+}
+
 // MARK: - House decor
 
 struct Decor {
@@ -368,6 +398,37 @@ struct Charter: Codable {
             return Charter(client: clients[(day + i * 3) % clients.count], habitat: w.rawValue, perFish: per,
                            bonus: target * per, target: target, day: day)
         }
+    }
+}
+
+extension Charter {
+    /// How many clients come along on the boat.
+    var partySize: Int {
+        switch client {
+        case "THE KIM FAMILY", "BACHELOR PARTY": return 3
+        case "TOURISTS FROM AFAR": return 2
+        default: return 1
+        }
+    }
+    var complete: Bool { caught >= target }
+    /// The clients' looks (stable for each client).
+    var party: [Outfit] { (0..<partySize).map { Charter.guest(client, $0) } }
+
+    static func guest(_ client: String, _ i: Int) -> Outfit {
+        let sid = client.unicodeScalars.reduce(0) { ($0 &* 31 &+ Int($1.value)) & 0xFFFF }
+        func pick<T>(_ a: [T], _ k: Int) -> T { a[Int(hrand(i, sid, k) * Double(a.count)) % a.count] }
+        let shirts: [UInt32] = [0xE85A5A, 0x3A8AE8, 0xF2C83A, 0x5AC87A, 0xE88A3A, 0xA85AE8, 0xF0F0F0, 0x2AB8B0]
+        let pants: [UInt32] = [0x2A3A5A, 0x5A4A3A, 0xC8B890, 0x3A3A44, 0x6A8A4A]
+        var hat: HatStyle = pick([.bucket, .straw, .cap, .beanie], 1)
+        var hatC: UInt32 = pick([0xF0E8D0, 0xC8A050, 0x3A6AE8, 0xE85A5A, 0x2A2A34], 2)
+        var shirt = pick(shirts, 3)
+        if client == "RETIRED ADMIRAL" { hat = .cap; hatC = 0xF4F4F4; shirt = 0x1A2A5A }
+        if client == "CEO MORGAN" { hat = .straw; shirt = 0x2A2A34 }
+        if client == "BACHELOR PARTY" && i == 0 { hat = .straw; hatC = 0xFFD23A }
+        let p = pick(pants, 4)
+        return Outfit(hatStyle: hat, hat: hatC, hatBand: PColor(hatC).shade(-0.3).hex, shirt: shirt, shirt2: PColor(shirt).shade(-0.25).hex,
+                      pattern: pick([.plain, .stripes, .floral, .plain], 5), pants: p, pants2: PColor(p).shade(-0.2).hex,
+                      shorts: hrand(i, sid, 6) < 0.4, hair: pick(GearItem.hairColors.prefix(5).map { $0 }, 7), skin: pick(GearItem.skinTones, 8))
     }
 }
 

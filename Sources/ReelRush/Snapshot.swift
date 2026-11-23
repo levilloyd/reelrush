@@ -47,6 +47,50 @@ func runSnapshots(view: SKView, dir: String) {
         game.save.boatsOwned = ["yacht"]; game.save.hitched = "yacht"
         present(game.mapScene); game.mapScene.debugBoard(.ocean); game.mapScene.debugSchoolsNearBoat()
     }))
+    steps.append(("37_moored_trailer", {
+        setTime(14, .sunny)
+        game.save.boatsOwned = ["skiff"]; game.save.hitched = "skiff"
+        game.save.carsOwned = ["car.truck"]; game.save.car = "car.truck"; game.save.trailers = ["trailer.big"]
+        present(game.mapScene); game.mapScene.debugMooredAtShore(.lake)
+    }))
+    steps.append(("38_loaded_trailer", { game.mapScene.keyPressed(Key.e) }))
+    steps.append(("39_boat_near_car", {
+        game.save.fuel["skiff"] = 5; game.save.fuel["car.truck"] = 60
+        present(TitleScene(size: Game.sceneSize)); present(game.mapScene); game.mapScene.debugMooredAtShore(.lake, aboard: true)
+    }))
+    steps.append(("40_loaded_from_water", { game.mapScene.keyPressed(Key.e) }))
+    steps.append(("41_gas_station", {
+        game.save.coins = 500; game.save.boatsOwned = ["skiff", "yacht"]; game.save.fuel["yacht"] = 40
+        present(ShopScene(kind: .gas))
+    }))
+    steps.append(("43_charter_map", {
+        setTime(9, .sunny)
+        game.save.boatsOwned = ["yacht"]; game.save.hitched = "yacht"
+        game.save.charter = Charter(client: "THE KIM FAMILY", habitat: "lake", perFish: 100, bonus: 500, target: 5, caught: 2, day: game.save.day)
+        present(TitleScene(size: Game.sceneSize)); present(game.mapScene); game.mapScene.debugBoard(.lake)
+    }))
+    steps.append(("44_charter_fishing", {
+        present(FishingScene(habitat: .lake, boat: Boat.byID["yacht"], school: false))
+    }))
+    steps.append(("42_gas_building", {
+        present(game.mapScene); game.mapScene.keyPressed(Key.c)
+        let g = game.mapScene.world.building(.gas).door
+        game.mapScene.debugWalk(to: CGPoint(x: g.x, y: g.y - 20), facing: .up)
+    }))
+    steps.append(("35_home_sites", {
+        setTime(11, .sunny); game.save.boatShedBuilt = false; game.save.garageBuilt = false
+        game.save.add("timber", 12); game.save.add("stone", 8)
+        present(game.mapScene)
+        let g = game.mapScene.world.building(.garage).door
+        game.mapScene.debugWalk(to: CGPoint(x: g.x, y: g.y - 20), facing: .up)
+    }))
+    steps.append(("36_home_built", {
+        game.save.boatShedBuilt = true; game.save.garageBuilt = true
+        game.save.carsOwned = ["car.truck", "car.coupe"]; game.save.car = "car.truck"
+        present(TitleScene(size: Game.sceneSize)); present(game.mapScene)
+        let g = game.mapScene.world.building(.garage).door
+        game.mapScene.debugWalk(to: CGPoint(x: g.x - 140, y: g.y - 30), facing: .up)
+    }))
     steps.append(("32_shark_hooked", {
         setTime(7, .sunny); game.save.rodsOwned = [0, 7]; game.save.rodLevel = 7
         let f = FishingScene(habitat: .deepSea, boat: Boat.byID["yacht"], school: false); present(f)

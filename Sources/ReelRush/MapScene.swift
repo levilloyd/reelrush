@@ -43,6 +43,9 @@ final class MapScene: BaseScene {
     private var wakeTimer = 0.0
     private(set) var inBoat = false
     private var moored = false
+    private var boatOnTrailer = true   // false once launched, until loaded back onto the trailer
+    /// Charter clients currently riding in your boat.
+    private(set) var partyAboard = false
     private var carNode: CarNode?
     private var driving = false
     private var carVel = CGVector.zero
@@ -68,11 +71,16 @@ final class MapScene: BaseScene {
     private let seedLabel = inkLabel("", scale: 2, align: .left)
     private let energyFill = SKSpriteNode(color: .green, size: CGSize(width: 24, height: 4))
     private let energyLabel = PixelLabel("", scale: 2)
+    private let fuelLabel = PixelLabel("", scale: 2, align: .left)
+    private let fuelBack = SKSpriteNode(color: PColor(0x2A1A0E).ns, size: CGSize(width: 124, height: 10))
+    private let fuelFill = SKSpriteNode(color: PColor(0x4EC83A).ns, size: CGSize(width: 120, height: 6))
+    private var fuelWarned: [String: Int] = [:]   // 1 = low warning shown, 2 = empty warning shown
     private let prompt = SKNode()
     private var promptBG = SKSpriteNode()
     private let promptLabel = PixelLabel("", scale: 3)
     private let toastLabel = PixelLabel("", scale: 4, color: .gold)
     private let minimap = SKNode()
+    private var buildSprites: [BuildingKind: SKSpriteNode] = [:]   // boat shed & garage (site until built)
     // Fish finder (sonar shown while out in a boat)
     private let finder = SKNode()
     private let finderSweep = SKSpriteNode()
@@ -125,6 +133,8 @@ final class MapScene: BaseScene {
         lastTime = 0
         player.setPixelTexture(PlayerArt.texture(playerDir, frame: 0), scale: 2)
         if let n = boatNode { n.setDir(n.dir, force: true) }
+        if partyAboard, let ch = Game.shared.save.charter, ch.day == Game.shared.save.day { if boatNode?.party.isEmpty == true { boatNode?.party = ch.party } }
+        else if partyAboard { partyAboard = false; boatNode?.party = [] }
         if let boat = Game.shared.save.boat, let node = boatNode, node.kind != boat.kind {
             let pos = node.position
             node.removeFromParent()
@@ -132,6 +142,7 @@ final class MapScene: BaseScene {
         }
         for key in Game.shared.save.plots.keys { refreshPlot(key) }
         closeDialog()
+        for (k, s) in buildSprites { s.setPixelTexture(Game.shared.save.isBuilt(k) ? PropArt.building(k) : PropArt.buildSite(), scale: 2) }
         syncCar()
         refreshHUD()
         showNews()
@@ -154,8 +165,9 @@ final class MapScene: BaseScene {
             let old = carNode?.position
             carNode?.removeFromParent()
             let n = CarNode(car: car)
-            let shed = world.building(.boatShed).door
-            n.position = old ?? CGPoint(x: shed.x, y: shed.y - 40)
+            n.boatAboard = boatOnTrailer
+            let garage = world.building(.garage).door
+            n.position = old ?? CGPoint(x: garage.x, y: garage.y - 40)
             addChild(n)
             carNode = n
         }
@@ -196,18 +208,20 @@ final class MapScene: BaseScene {
         }
 
         for b in world.buildings {
-            let s = pixelSprite(PropArt.building(b.kind, variant: b.variant), scale: 2)
+            let built = Game.shared.save.isBuilt(b.kind)
+            let s = pixelSprite(built ? PropArt.building(b.kind, variant: b.variant) : PropArt.buildSite(), scale: 2)
+            if Construction.costs[b.kind] != nil { buildSprites[b.kind] = s }
             s.anchorPoint = CGPoint(x: 0.5, y: 0)
             s.position = CGPoint(x: b.door.x, y: b.door.y - (b.kind == .mine ? 0 : 4))
             s.zPosition = depth(s.position.y)
             addChild(s)
-            if [.tackle, .general, .house, .cottageA, .cottageB, .cottageC, .villa, .autos].contains(b.kind) {
+            if [.tackle, .general, .house, .cottageA, .cottageB, .cottageC, .villa, .autos, .gas].contains(b.kind) {
                 for dx in [-0.28, 0.28] as [CGFloat] {
                     addGlow(at: CGPoint(x: s.position.x + s.size.width * dx, y: s.position.y + 32), radius: 56, color: PColor(0xF2A050), strength: 0.3)
                 }
             }
             let names: [BuildingKind: String] = [.tackle: "BAIT & TACKLE", .general: "HARDWARE", .cottageA: "BOUTIQUE", .cottageB: "MARKET", .cottageC: "HOME GOODS",
-                                                 .house: "HOME", .mine: "MINE", .shed: "WORKSHOP", .boatShed: "BOAT SHED", .autos: "AUTO SHOP"]
+                                                 .house: "HOME", .mine: "MINE", .shed: "WORKSHOP", .boatShed: "BOAT SHED", .autos: "AUTO SHOP", .garage: "GARAGE", .gas: "GAS STATION"]
             if let n = names[b.kind] {
                 let l = PixelLabel(n, scale: 2, color: .gold)
                 l.position = CGPoint(x: s.position.x, y: s.position.y + s.size.height + 14)
@@ -349,6 +363,15 @@ final class MapScene: BaseScene {
         eb.addChild(eLetter)
         energyLabel.position = CGPoint(x: 640 - 40, y: -400 + 14)
         hud.addChild(energyLabel)
+
+        fuelLabel.position = CGPoint(x: -628, y: -340)
+        hud.addChild(fuelLabel)
+        fuelBack.anchorPoint = CGPoint(x: 0, y: 0.5)
+        fuelBack.position = CGPoint(x: -628, y: -362)
+        hud.addChild(fuelBack)
+        fuelFill.anchorPoint = CGPoint(x: 0, y: 0.5)
+        fuelFill.position = CGPoint(x: -626, y: -362)
+        hud.addChild(fuelFill)
 
         let mw = WorldMap.size.width * miniScale, mh = WorldMap.size.height * miniScale
         minimap.position = CGPoint(x: 640 - 80 - mw / 2 - 12, y: -400 + mh / 2 + 22)
@@ -518,6 +541,7 @@ final class MapScene: BaseScene {
         updateCamera()
         updateSchools(dt)
         updateFinder(dt)
+        updateFuelGauge()
         updateInteraction()
         updateAtmosphere(dt)
         if Int(clock * 4) != Int((clock - dt) * 4) { refreshHUD() }
@@ -559,7 +583,9 @@ final class MapScene: BaseScene {
         let t = CGFloat(dt)
         let tile = world.tile(at: node.position)
         let road = tile == .path || tile == .plaza || tile == .bridge || tile == .pier
-        let maxSp = CGFloat(node.car.speed) * (road ? 1 : (node.car.id == "car.jeep" ? 0.9 : 0.55))
+        var maxSp = CGFloat(node.car.speed) * (road ? 1 : (node.car.id == "car.jeep" ? 0.9 : 0.55))
+        if Game.shared.save.gas(node.car.id) <= 0 { maxSp *= Fuel.emptyCrawl }
+        let before = node.position
         let len = max(1, sqrt(ix * ix + iy * iy))
         carVel.dx += ix / len * 1400 * t
         carVel.dy += iy / len * 1400 * t
@@ -578,6 +604,9 @@ final class MapScene: BaseScene {
         node.zPosition = depth(node.position.y)
         player.position = node.position
         lantern.position = node.position
+        // Towing a boat burns extra gas.
+        let towingBoat = boatOnTrailer && Game.shared.save.towProblem == nil
+        burnFuel(node.car.id, moved: hypot(node.position.x - before.x, node.position.y - before.y), factor: towingBoat ? 1.4 : 1)
     }
 
     private func toggleCar() {
@@ -666,6 +695,11 @@ final class MapScene: BaseScene {
         if let problem = save.towProblem { toast(problem); Sound.play("Funk", volume: 0.3); return }
         guard driving else { toast("DRIVE YOUR CAR (C) TO THE WATER TO LAUNCH YOUR BOAT"); return }
         guard let boat = save.boat, let h = facingHabitat else { return }
+        guard boatOnTrailer else {
+            toast("YOUR \(boat.name.uppercased()) IS STILL ON THE WATER.\nDRIVE UP TO IT AND PRESS E TO LOAD IT,\nOR RE-HITCH IT AT THE BOAT SHED.")
+            Sound.play("Funk", volume: 0.3)
+            return
+        }
         guard boat.waters.contains(h) else {
             toast("YOUR \(boat.name.uppercased()) CAN'T HANDLE THE \(h.displayName.uppercased())!")
             Sound.play("Funk", volume: 0.3)
@@ -687,7 +721,83 @@ final class MapScene: BaseScene {
         boatNode = makeBoat(boat, at: spot)
         boatNode?.setDir(carNode?.dir ?? playerDir, force: true)
         boatVel = .zero
+        boatOnTrailer = false
+        carNode?.boatAboard = false
         Sound.play("Bottle", volume: 0.35)
+        boardCharterParty()
+    }
+
+    // MARK: Charter party
+
+    /// Today's charter clients climb aboard a charter-capable boat when you launch it.
+    private func boardCharterParty() {
+        let s = Game.shared.save
+        guard let ch = s.charter, ch.day == s.day, !ch.complete, let boat = s.boat, boat.charter else { return }
+        partyAboard = true
+        boatNode?.party = ch.party
+        toast("\(ch.client) CLIMBED ABOARD!\nHEAD FOR \(ch.water.spotName.uppercased()).")
+    }
+
+    /// Back on land: a finished charter's clients thank you and head home.
+    private func dropOffCharterParty() {
+        guard partyAboard else { return }
+        let s = Game.shared.save
+        guard let ch = s.charter, ch.complete || ch.day != s.day else { return }
+        partyAboard = false
+        boatNode?.party = []   // the charter stays on record for today, so it can't be booked again
+        toast("\(ch.client) HEADS HOME. THANKS FOR THE TRIP!")
+    }
+
+    private func mooredBoatInReach(of car: CarNode) -> Bool {
+        guard moored, !boatOnTrailer, let b = boatNode else { return false }
+        return hypot(b.position.x - car.position.x, b.position.y - car.position.y) < Self.trailerReach
+    }
+
+    /// How close the car and boat must be to load the boat (~7 tiles).
+    private static let trailerReach: CGFloat = 220
+
+    /// Sailing: is the parked car (with its empty trailer) close enough to pull the boat out?
+    private func carInReachOfBoat() -> Bool {
+        guard inBoat, !boatOnTrailer, let b = boatNode, let car = carNode else { return false }
+        return hypot(b.position.x - car.position.x, b.position.y - car.position.y) < Self.trailerReach
+    }
+
+    /// Sail up to the parked car and pull the boat straight out onto the trailer; you end up at the wheel.
+    private func loadFromWater() {
+        let save = Game.shared.save
+        if let problem = save.towProblem { toast(problem); Sound.play("Funk", volume: 0.3); return }
+        guard let car = carNode else { return }
+        inBoat = false
+        returnBoatToTrailer()
+        driving = true
+        carVel = .zero
+        player.isHidden = true
+        player.position = car.position
+        Sound.play("Bottle", volume: 0.35)
+        toast("\(save.boat?.name.uppercased() ?? "BOAT") LOADED ONTO THE TRAILER!")
+    }
+
+    /// Winch a moored boat back onto the car's trailer.
+    private func loadBoat() {
+        let save = Game.shared.save
+        if let problem = save.towProblem { toast(problem); Sound.play("Funk", volume: 0.3); return }
+        returnBoatToTrailer()
+        Sound.play("Bottle", volume: 0.35)
+        toast("\(save.boat?.name.uppercased() ?? "BOAT") LOADED ONTO THE TRAILER!")
+    }
+
+    /// Puts the hitched boat back on the trailer (also used when re-hitching at the boat shed).
+    func returnBoatToTrailer() {
+        guard !inBoat else { return }
+        if partyAboard {
+            dropOffCharterParty()
+            partyAboard = false   // an unfinished charter's clients wait on the dock for you to relaunch
+        }
+        boatNode?.removeFromParent()
+        boatNode = nil
+        moored = false
+        boatOnTrailer = true
+        carNode?.boatAboard = true
     }
 
     private func goAshore() {
@@ -699,6 +809,7 @@ final class MapScene: BaseScene {
         player.position = st.0
         playerDir = st.1
         Sound.play("Pop", volume: 0.3)
+        dropOffCharterParty()
     }
 
     private func updateBoat(_ dt: Double, _ ix: CGFloat, _ iy: CGFloat) {
@@ -711,8 +822,11 @@ final class MapScene: BaseScene {
         boatVel.dx *= drag
         boatVel.dy *= drag
         let sp = sqrt(boatVel.dx * boatVel.dx + boatVel.dy * boatVel.dy)
-        let maxSp = CGFloat(boat.speed) * 1.2
+        var maxSp = CGFloat(boat.speed) * 1.2
+        if Game.shared.save.gas(boat.id) <= 0 { maxSp *= Fuel.emptyCrawl }
         if sp > maxSp { boatVel.dx *= maxSp / sp; boatVel.dy *= maxSp / sp }
+        let before = node.position
+        defer { burnFuel(boat.id, moved: hypot(node.position.x - before.x, node.position.y - before.y), factor: 1) }
         let nx = node.position.x + boatVel.dx * t
         if boatFits(CGPoint(x: nx, y: node.position.y), boat) { node.position.x = nx } else { boatVel.dx *= -0.3 }
         let ny = node.position.y + boatVel.dy * t
@@ -759,6 +873,71 @@ final class MapScene: BaseScene {
         s.run(.repeatForever(.animate(with: (0..<4).map { PropArt.school(frame: $0) }, timePerFrame: 0.18)))
         s.run(.sequence([.fadeIn(withDuration: 1), .wait(forDuration: Double.random(in: 60...110)), .fadeOut(withDuration: 1.5), .removeFromParent()]))
         schools.append(s)
+    }
+
+    // MARK: Fuel
+
+    private func burnFuel(_ id: String, moved: CGFloat, factor: Double) {
+        guard moved > 0.01 else { return }
+        Game.shared.save.burnGas(id, Double(moved / WorldMap.ts) * Fuel.burn(id) * factor)
+        let frac = Game.shared.save.gas(id) / Fuel.tank(id)
+        let name = Car.byID[id]?.name ?? Boat.byID[id]?.name ?? "TANK"
+        let warned = fuelWarned[id] ?? 0
+        if frac <= 0, warned < 2 {
+            fuelWarned[id] = 2
+            toast("OUT OF GAS! THE \(name.uppercased()) CAN ONLY CRAWL.\nFILL UP AT THE GAS STATION IN TOWN.")
+            Sound.play("Funk", volume: 0.35)
+        } else if frac <= 0.15, warned < 1 {
+            fuelWarned[id] = 1
+            toast("LOW ON GAS! FILL UP AT THE GAS STATION IN TOWN.")
+        } else if frac > 0.15, warned > 0 {
+            fuelWarned[id] = 0
+        }
+    }
+
+    private func updateFuelGauge() {
+        let s = Game.shared.save
+        let id: String? = inBoat ? s.boat?.id : (driving ? carNode?.car.id : nil)
+        guard let v = id else { fuelLabel.isHidden = true; fuelBack.isHidden = true; fuelFill.isHidden = true; return }
+        fuelLabel.isHidden = false; fuelBack.isHidden = false; fuelFill.isHidden = false
+        let tank = Fuel.tank(v), left = s.gas(v), frac = left / tank
+        let name = (Car.byID[v]?.name ?? Boat.byID[v]?.name ?? "").uppercased()
+        fuelLabel.text = "GAS · \(name) \(Int(left.rounded(.up)))/\(Int(tank)) L" + (left <= 0 ? "  EMPTY!" : "")
+        fuelLabel.textColor = left <= 0 ? PColor(0xFF6A5A) : (frac <= 0.15 ? PColor(0xFFC83A) : .white)
+        fuelFill.size.width = max(0, snap(120 * CGFloat(frac), 2))
+        fuelFill.color = (frac <= 0.15 ? PColor(0xE8483A) : (frac <= 0.4 ? PColor(0xF2C83A) : PColor(0x4EC83A))).ns
+    }
+
+    // MARK: Construction
+
+    private func construct(_ k: BuildingKind) {
+        guard let cost = Construction.costs[k] else { return }
+        let game = Game.shared
+        let t = game.save.count("timber"), st = game.save.count("stone")
+        guard t >= cost.timber, st >= cost.stone else {
+            toast("TO BUILD THE \(Construction.name(k)) YOU NEED \(Construction.costLabel(k)).\nYOU HAVE \(t) TIMBER + \(st) STONE.")
+            Sound.play("Funk", volume: 0.3)
+            return
+        }
+        game.save.take("timber", cost.timber)
+        game.save.take("stone", cost.stone)
+        if k == .boatShed { game.save.boatShedBuilt = true } else { game.save.garageBuilt = true }
+        game.save.persist()
+        buildSprites[k]?.setPixelTexture(PropArt.building(k), scale: 2)
+        Sound.play("Glass", volume: 0.5)
+        toast(k == .garage ? "YOU BUILT A GARAGE! BUY CARS AT THE AUTO SHOP." : "YOU BUILT A BOAT SHED! BUY BOATS AT BAIT & TACKLE.")
+        refreshHUD()
+    }
+
+    private func switchCar() {
+        let s = Game.shared.save
+        guard !s.carsOwned.isEmpty else { toast("YOUR GARAGE IS EMPTY.\nBUY A CAR AT THE AUTO SHOP!"); return }
+        let i = s.car.flatMap { s.carsOwned.firstIndex(of: $0) } ?? -1
+        let next = s.carsOwned[(i + 1) % s.carsOwned.count]
+        Game.shared.save.car = next
+        carNode?.removeFromParent(); carNode = nil
+        syncCar()
+        toast("NOW DRIVING: \(Car.byID[next]?.name.uppercased() ?? "")")
     }
 
     // MARK: Fish finder
@@ -1022,7 +1201,8 @@ final class MapScene: BaseScene {
                 parts.append("SPACE: FISH FROM BOAT")
                 parts.append("BITES: \(FishSpecies.activityLabel(FishSpecies.activity(h, minutes: save.minutes, weather: save.weather, day: save.day, saltRod: save.hasSaltRod)).0)")
             }
-            if shoreTarget != nil { parts.append("E: GO ASHORE") }
+            if carInReachOfBoat() { parts.append(save.towProblem ?? "E: LOAD ONTO TRAILER") }
+            else if shoreTarget != nil { parts.append("E: GO ASHORE") }
             if school(near: node.position, within: 90) != nil { parts.append("* FISH SCHOOL! *") }
             setPrompt(parts.isEmpty ? nil : parts.joined(separator: "    "))
             return
@@ -1031,6 +1211,11 @@ final class MapScene: BaseScene {
         if driving, let node = carNode {
             let v = dirVector(node.dir)
             var parts = ["C: GET OUT"]
+            if mooredBoatInReach(of: node) {
+                parts.append(save.towProblem ?? "E: LOAD \(save.boat?.name.uppercased() ?? "BOAT") ONTO TRAILER")
+                setPrompt(parts.joined(separator: "    "))
+                return
+            }
             for dist in [44.0, 64.0] as [CGFloat] {
                 let p = CGPoint(x: node.position.x + v.dx * dist, y: node.position.y + 10 + v.dy * dist)
                 if let h = world.tile(at: p).habitat {
@@ -1052,9 +1237,20 @@ final class MapScene: BaseScene {
         }
         let doorNames: [BuildingKind: String] = [.tackle: "ENTER BAIT & TACKLE (FISHING)", .general: "ENTER HARDWARE (TOOLS)", .cottageA: "ENTER BOUTIQUE (CLOTHES)",
                                                  .cottageB: "ENTER MARKET (SEEDS & FOOD)", .cottageC: "ENTER HOME GOODS (FURNITURE)",
-                                                 .boatShed: "BOAT SHED (CHOOSE BOAT TO TOW)", .autos: "ENTER AUTO SHOP (CARS & TRAILERS)", .villa: "KNOCK ON THE DOOR", .house: "ENTER HOME", .mine: "ENTER THE MINE", .shed: "USE WORKSHOP (WELDING)"]
+                                                 .boatShed: "BOAT SHED (CHOOSE BOAT TO TOW)", .autos: "ENTER AUTO SHOP (CARS & TRAILERS)", .gas: "ENTER GAS STATION (FILL UP)", .villa: "KNOCK ON THE DOOR", .house: "ENTER HOME", .mine: "ENTER THE MINE", .shed: "USE WORKSHOP (WELDING)"]
         for b in world.buildings {
-            guard let name = doorNames[b.kind], hypot(b.door.x - pp.x, b.door.y - pp.y) < 56 else { continue }
+            guard hypot(b.door.x - pp.x, b.door.y - pp.y) < 56 else { continue }
+            if !Game.shared.save.isBuilt(b.kind) {
+                action = .door(b.kind)
+                setPrompt("SPACE: BUILD \(Construction.name(b.kind)) (\(Construction.costLabel(b.kind)))")
+                return
+            }
+            var label = doorNames[b.kind]
+            if b.kind == .garage {
+                let cars = Game.shared.save.carsOwned
+                label = cars.count > 1 ? "GARAGE (SWITCH CAR)" : (cars.isEmpty ? "GARAGE (BUY CARS AT THE AUTO SHOP)" : "GARAGE")
+            }
+            guard let name = label else { continue }
             action = .door(b.kind)
             setPrompt("SPACE: \(name)")
             return
@@ -1381,8 +1577,10 @@ final class MapScene: BaseScene {
             case .chop(let k): chop(k)
             case .farm(let k): doFarm(k)
             case .door(let b):
+                if !Game.shared.save.isBuilt(b) { construct(b); return }
                 Sound.play("Pop")
                 switch b {
+                case .garage: switchCar()
                 case .tackle: Game.shared.showShop(.tackle)
                 case .general: Game.shared.showShop(.hardware)
                 case .cottageA: Game.shared.showShop(.boutique)
@@ -1390,6 +1588,7 @@ final class MapScene: BaseScene {
                 case .cottageC: Game.shared.showShop(.homeGoods)
                 case .boatShed: Game.shared.presentScene(BoatShedScene(size: Game.sceneSize))
                 case .autos: Game.shared.showShop(.autos)
+                case .gas: Game.shared.showShop(.gas)
                 case .villa: toast(["NOBODY'S HOME.", "YOU HEAR A RADIO PLAYING INSIDE.", "A CAT MEOWS FROM THE WINDOW.", "SMELLS LIKE FRESH BREAD!"].randomElement()!)
                 case .house: Game.shared.showHouse()
                 case .mine: Game.shared.enterMine()
@@ -1403,7 +1602,8 @@ final class MapScene: BaseScene {
             case .none: break
             }
         case Key.e:
-            if inBoat { goAshore() }
+            if inBoat, carInReachOfBoat() { loadFromWater() }
+            else if inBoat { goAshore() }
             else if let b = boatNode, moored, !driving, hypot(b.position.x - player.position.x, b.position.y - player.position.y) < 90 {
                 inBoat = true
                 moored = false
@@ -1411,6 +1611,7 @@ final class MapScene: BaseScene {
                 boatVel = .zero
                 Sound.play("Bottle", volume: 0.35)
             }
+            else if driving, let car = carNode, mooredBoatInReach(of: car) { loadBoat() }
             else if facingHabitat != nil { launchBoat() }
         case Key.c:
             if !inBoat { toggleCar() }
@@ -1434,13 +1635,43 @@ final class MapScene: BaseScene {
     func placeAtHome() { placeAt(world.houseDoor) }
 
     func debugWalk(to p: CGPoint, facing d: Dir) {
-        inBoat = false
-        boatNode?.removeFromParent()
-        boatNode = nil
+        // A moored boat stays where it was left; if we were aboard, the boat goes back on the trailer.
+        if inBoat || !moored {
+            inBoat = false
+            returnBoatToTrailer()
+        }
         player.isHidden = false
         player.position = p
         playerDir = d
         updateCamera()
+    }
+
+    /// Snapshot helper: moor the boat on a lake and park the car (empty trailer) on the shore beside it.
+    func debugMooredAtShore(_ h: Habitat, aboard: Bool = false) {
+        guard let boat = Game.shared.save.boat, Game.shared.save.activeCar != nil else { return }
+        for (x, y) in schoolSpots where world[x, y] == .water(h) {
+            let p = world.center(x, y)
+            guard boatFits(p, boat) else { continue }
+            for off in [CGPoint(x: 0, y: -100), CGPoint(x: 0, y: 100), CGPoint(x: -100, y: 0), CGPoint(x: 100, y: 0)] {
+                let cp = CGPoint(x: p.x + off.x, y: p.y + off.y)
+                guard carFits(cp) else { continue }
+                inBoat = false; moored = true; boatOnTrailer = false
+                boatNode?.removeFromParent()
+                boatNode = makeBoat(boat, at: p)
+                carNode?.removeFromParent(); carNode = nil
+                syncCar()
+                carNode?.position = cp
+                carNode?.setDir(off.x == 0 ? (off.y < 0 ? .up : .down) : (off.x < 0 ? .right : .left), force: true)
+                carNode?.zPosition = depth(cp.y)
+                driving = !aboard
+                inBoat = aboard
+                moored = !aboard
+                player.isHidden = true
+                player.position = aboard ? p : cp
+                updateCamera()
+                return
+            }
+        }
     }
 
     /// Snapshot helper: fill the water around the boat with schools.
@@ -1464,10 +1695,14 @@ final class MapScene: BaseScene {
             let p = world.center(x, y)
             guard boatFits(p, boat) else { continue }
             inBoat = true
+            moored = false
+            boatOnTrailer = false
+            carNode?.boatAboard = false
             player.isHidden = true
             boatNode?.removeFromParent()
             boatNode = makeBoat(boat, at: p)
             boatNode?.setDir(.right, force: true)
+            boardCharterParty()
             updateCamera()
             return
         }

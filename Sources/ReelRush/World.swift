@@ -50,7 +50,7 @@ struct TreeSpot {
     var key: String { "\(x),\(y)" }
 }
 
-enum BuildingKind: String { case tackle, general, house, cottageA, cottageB, cottageC, mine, fountain, shed, boatShed, autos, villa }
+enum BuildingKind: String { case tackle, general, house, cottageA, cottageB, cottageC, mine, fountain, shed, boatShed, autos, villa, garage, gas }
 
 struct Building {
     let kind: BuildingKind
@@ -83,7 +83,9 @@ final class WorldMap {
         Building(kind: .fountain, x: 128, y: 83, w: 2, h: 2),
         Building(kind: .shed, x: 65, y: 72, w: 3, h: 2),
         Building(kind: .boatShed, x: 51, y: 72, w: 4, h: 3),
+        Building(kind: .garage, x: 70, y: 72, w: 4, h: 3),
         Building(kind: .autos, x: 132, y: 77, w: 5, h: 3),
+        Building(kind: .gas, x: 148, y: 76, w: 4, h: 3),
         Building(kind: .villa, x: 120, y: 77, w: 4, h: 3, variant: 0),
         Building(kind: .villa, x: 110, y: 86, w: 4, h: 3, variant: 1),
         Building(kind: .villa, x: 144, y: 86, w: 4, h: 3, variant: 2),

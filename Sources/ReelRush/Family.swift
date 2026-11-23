@@ -195,6 +195,7 @@ final class BoatShedScene: BaseScene {
             guard n > 0 else { return }
             Game.shared.save.hitched = Game.shared.save.boatsOwned[selected]
             Game.shared.save.persist()
+            Game.shared.mapScene.returnBoatToTrailer()
             feedback.text = "HITCHED THE \(Boat.byID[Game.shared.save.hitched!]!.name.uppercased())!"
             feedback.textColor = PColor(0x2E8A2A)
             Sound.play("Tink", volume: 0.4)

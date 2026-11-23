@@ -634,7 +634,7 @@ struct Car {
         Car(id: "car.pickup", name: "Old Pickup", price: 1200, speed: 430, tow: 1, body: 0x9A5A2A, blurb: "Rusty but trusty. Tows small trailers."),
         Car(id: "car.jeep", name: "Trail Jeep", price: 2500, speed: 470, tow: 1, body: 0x4E7A3A, blurb: "Fast on grass and dirt. Tows small trailers."),
         Car(id: "car.truck", name: "Big Truck", price: 4000, speed: 470, tow: 2, body: 0x2A5AA8, blurb: "Tows any trailer, even yachts."),
-        Car(id: "car.coupe", name: "Sports Coupe", price: 6000, speed: 680, tow: 0, body: 0xE83A3A, blurb: "Blazing fast. Can't tow anything."),
+        Car(id: "car.coupe", name: "Sports Coupe", price: 6000, speed: 980, tow: 0, body: 0xE83A3A, blurb: "Blazing fast. Can't tow anything."),
     ]
     static let byID: [String: Car] = Dictionary(uniqueKeysWithValues: all.map { ($0.id, $0) })
 }
@@ -936,6 +936,9 @@ struct SaveData: Codable {
     var rodsOwned: [Int] = [0]
     var boatsOwned: [String] = []
     var fishFinder = false    // sonar for spotting schools from any boat
+    var boatShedBuilt = false // built from timber + stone; boats are kept here
+    var garageBuilt = false   // built from timber + stone; cars park here
+    var fuel: [String: Double] = [:]   // liters left per car/boat id; missing = full tank
     var hitched: String?
     var carsOwned: [String] = []
     var car: String?
@@ -1036,6 +1039,10 @@ struct SaveData: Codable {
         hitched = try c.decodeIfPresent(String.self, forKey: .hitched) ?? boatsOwned.last
         carsOwned = try c.decodeIfPresent([String].self, forKey: .carsOwned) ?? []
         fishFinder = try c.decodeIfPresent(Bool.self, forKey: .fishFinder) ?? false
+        // Saves from before construction already have their boats and cars, so count those buildings as built.
+        boatShedBuilt = try c.decodeIfPresent(Bool.self, forKey: .boatShedBuilt) ?? !boatsOwned.isEmpty
+        garageBuilt = try c.decodeIfPresent(Bool.self, forKey: .garageBuilt) ?? !carsOwned.isEmpty
+        fuel = try c.decodeIfPresent([String: Double].self, forKey: .fuel) ?? [:]
         car = try c.decodeIfPresent(String.self, forKey: .car)
         trailers = try c.decodeIfPresent([String].self, forKey: .trailers) ?? []
         playerName = try c.decodeIfPresent(String.self, forKey: .playerName) ?? "ANGLER"
@@ -1101,6 +1108,17 @@ struct SaveData: Codable {
 
     func rodStats(_ h: Habitat) -> (bar: Double, reel: Double, luck: Double, special: Bool?) { rod.stats(h, season: season) }
     var hasSaltRod: Bool { rod.isSaltwater }
+
+    func gas(_ id: String) -> Double { min(Fuel.tank(id), max(0, fuel[id] ?? Fuel.tank(id))) }
+    mutating func burnGas(_ id: String, _ liters: Double) { fuel[id] = max(0, gas(id) - liters) }
+
+    func isBuilt(_ k: BuildingKind) -> Bool {
+        switch k {
+        case .boatShed: return boatShedBuilt
+        case .garage: return garageBuilt
+        default: return true
+        }
+    }
 
     var kidBeds: Int { houseLevel * 2 }
     var spouseVillager: Villager? { spouse.flatMap { Villager.byID[$0] } }

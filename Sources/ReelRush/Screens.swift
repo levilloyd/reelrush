@@ -336,10 +336,10 @@ final class JournalScene: BaseScene {
 
 // MARK: - Shops
 
-enum ShopKind { case tackle, boutique, market, hardware, homeGoods, autos }
+enum ShopKind { case tackle, boutique, market, hardware, homeGoods, autos, gas }
 
 final class ShopScene: BaseScene {
-    private enum Tab { case sellFish, rods, boats, lures, bait, clothes, sellProduce, seeds, food, sellGoods, tools, home, decor, cars, trailers, charters }
+    private enum Tab { case sellFish, rods, boats, lures, bait, clothes, sellProduce, seeds, food, sellGoods, tools, home, decor, cars, trailers, charters, fuel }
 
     private struct Card {
         let title: String
@@ -374,6 +374,7 @@ final class ShopScene: BaseScene {
         case .hardware: tabs = [.sellGoods, .tools]
         case .homeGoods: tabs = [.home, .decor]
         case .autos: tabs = [.cars, .trailers]
+        case .gas: tabs = [.fuel]
         }
         tab = tabs[0]
         super.init(size: Game.sceneSize)
@@ -389,6 +390,7 @@ final class ShopScene: BaseScene {
         case .hardware: return "HARDWARE"
         case .homeGoods: return "HOME GOODS"
         case .autos: return "AUTO SHOP"
+        case .gas: return "GAS STATION"
         }
     }
 
@@ -410,6 +412,7 @@ final class ShopScene: BaseScene {
         case .cars: return "CARS"
         case .trailers: return "TRAILERS"
         case .charters: return "CHARTERS"
+        case .fuel: return "FILL UP"
         }
     }
 
@@ -541,6 +544,7 @@ final class ShopScene: BaseScene {
                             detail: "\(b.watersLabel.uppercased()) · +\(Int(b.sizeBonus * 100))% SIZE · \(Int(b.extraChance * 100))% BONUS · COOLER \(b.capacity) · \(b.big ? "BIG: TRUCK + BIG TRAILER" : "SMALL TRAILER")") {
                     let game = Game.shared
                     guard !game.save.boatsOwned.contains(b.id) else { return ("ALREADY IN YOUR BOAT SHED.", false) }
+                    guard game.save.boatShedBuilt else { return ("BUILD YOUR BOAT SHED FIRST (\(Construction.costLabel(.boatShed))).", false) }
                     guard game.save.coins >= b.price else { return ("NEED \(b.price - game.save.coins)G MORE!", false) }
                     game.save.coins -= b.price
                     game.save.boatsOwned.append(b.id)
@@ -548,6 +552,29 @@ final class ShopScene: BaseScene {
                     return ("THE \(b.name.uppercased()) IS IN YOUR BOAT SHED AT HOME!", true)
                 }
             } + [fishFinderCard(s)]
+        case .fuel:
+            let vehicles: [(id: String, name: String, icon: SKTexture)] =
+                s.carsOwned.compactMap { id in Car.byID[id].map { (id, $0.name, CarArt.side($0)) } } +
+                s.boatsOwned.compactMap { id in Boat.byID[id].map { (id, $0.name, BoatArt.side($0.kind, front: true)) } }
+            return vehicles.map { v in
+                let tank = Fuel.tank(v.id), left = s.gas(v.id)
+                let missing = tank - left
+                let cost = Int(ceil(missing * Double(Fuel.pricePerLiter)))
+                let full = missing < 0.5
+                return Card(title: v.name, icon: v.icon, status: full ? "FULL" : "FILL \(cost)G",
+                            statusColor: full ? PColor(0x2E8A2A) : (s.coins >= cost ? PColor(0x9A6010) : PColor(0xC8281A)),
+                            detail: "TANK \(Int(left))/\(Int(tank)) L · \(Fuel.pricePerLiter)G PER LITER · RANGE ABOUT \(Int(tank / Fuel.burn(v.id))) TILES ON A FULL TANK") {
+                    let game = Game.shared
+                    guard !full else { return ("THE \(v.name.uppercased()) IS ALREADY FULL.", false) }
+                    let liters = min(missing, Double(game.save.coins / Fuel.pricePerLiter))
+                    guard liters >= 1 else { return ("YOU CAN'T AFFORD ANY GAS!", false) }
+                    let paid = Int(ceil(liters * Double(Fuel.pricePerLiter)))
+                    game.save.coins -= min(paid, game.save.coins)
+                    game.save.fuel[v.id] = left + liters
+                    let topped = liters >= missing - 0.01
+                    return (topped ? "FILLED THE \(v.name.uppercased()) FOR \(paid)G!" : "BOUGHT \(Int(liters)) L FOR \(paid)G. THAT'S ALL YOU COULD AFFORD.", true)
+                }
+            }
         case .charters:
             let hasBoat = s.boatsOwned.contains { Boat.byID[$0]?.charter == true }
             return Charter.offers(day: s.day).map { ch in
@@ -572,12 +599,13 @@ final class ShopScene: BaseScene {
                             detail: c.blurb.uppercased() + " · PRESS C NEAR IT TO DRIVE") {
                     let game = Game.shared
                     if !game.save.carsOwned.contains(c.id) {
+                        guard game.save.garageBuilt else { return ("BUILD YOUR GARAGE FIRST (\(Construction.costLabel(.garage))).", false) }
                         guard game.save.coins >= c.price else { return ("NEED \(c.price - game.save.coins)G MORE!", false) }
                         game.save.coins -= c.price
                         game.save.carsOwned.append(c.id)
                     }
                     game.save.car = c.id
-                    return ("THE \(c.name.uppercased()) IS PARKED AT YOUR BOAT SHED!", true)
+                    return ("THE \(c.name.uppercased()) IS PARKED AT YOUR GARAGE!", true)
                 }
             }
         case .trailers:

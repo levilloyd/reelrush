@@ -452,6 +452,16 @@ final class BoatNode: SKNode {
     private let front = SKSpriteNode()
     private(set) var dir: Dir = .right
     private let scale: CGFloat
+    private var guests: [SKSpriteNode] = []
+    /// Charter clients riding along (drawn between the hull halves).
+    var party: [Outfit] = [] {
+        didSet {
+            guests.forEach { $0.removeFromParent() }
+            guests = party.map { _ in SKSpriteNode() }
+            for g in guests { insertChild(g, at: 1) }
+            setDir(dir, force: true)
+        }
+    }
 
     init(kind: BoatKind, scale: CGFloat = 2) {
         self.kind = kind
@@ -488,6 +498,11 @@ final class BoatNode: SKNode {
             rider.setPixelTexture(PlayerArt.texture(d, frame: 0), scale: scale)
             rider.anchorPoint = CGPoint(x: 0.5, y: 0)
             rider.position = CGPoint(x: (CGFloat(seat.0) - tw / 2) * scale * flip, y: -10 + CGFloat(seat.1) * scale)
+            for (i, g) in guests.enumerated() {
+                g.setPixelTexture(PlayerArt.texture(d, frame: 0, outfit: party[i]), scale: scale)
+                g.anchorPoint = CGPoint(x: 0.5, y: 0)
+                g.position = CGPoint(x: (CGFloat(seat.0 + 10 + i * 9) - tw / 2) * scale * flip, y: -10 + CGFloat(seat.1) * scale)
+            }
         case .up, .down:
             back.isHidden = false
             front.isHidden = true
@@ -499,6 +514,12 @@ final class BoatNode: SKNode {
             rider.setPixelTexture(PlayerArt.upperBody(d), scale: scale)
             rider.anchorPoint = CGPoint(x: 0.5, y: 0.5)
             rider.position = CGPoint(x: 0, y: d == .up ? -6 : 6)
+            for (i, g) in guests.enumerated() {
+                g.setPixelTexture(PlayerArt.upperBody(d, outfit: party[i]), scale: scale)
+                g.anchorPoint = CGPoint(x: 0.5, y: 0.5)
+                let col = CGFloat(i % 2 == 0 ? -1 : 1) * (i == 2 ? 0 : 9)
+                g.position = CGPoint(x: col * scale, y: (d == .up ? 12 : -12) * scale * (i == 2 ? 2 : 1))
+            }
         }
     }
 }
@@ -976,6 +997,25 @@ enum GoodArt {
 }
 
 extension PropArt {
+    /// An unbuilt plot: stone foundation, a few timber posts and a sign.
+    static func buildSite() -> SKTexture {
+        Tex.get("bld.site") {
+            let b = PixelBuffer(68, 52)
+            b.rect(2, 0, 64, 2, PColor(0x000000, 60))
+            b.rect(4, 2, 60, 8, PColor(0x9A968E))
+            for x in stride(from: 4, to: 64, by: 8) { b.rect(x, 2, 1, 8, PColor(0x6A665E)) }
+            b.rect(4, 6, 60, 1, PColor(0x6A665E))
+            for x in [6, 30, 58] { b.rect(x, 10, 4, 28, PColor(0xA0703C)); b.rect(x + 3, 10, 1, 28, PColor(0x6A4422)) }
+            b.rect(6, 36, 56, 4, PColor(0xA0703C)); b.rect(6, 36, 56, 1, PColor(0x6A4422))
+            b.line(10, 12, 28, 34, PColor(0x8A5A30)); b.line(34, 34, 56, 12, PColor(0x8A5A30))
+            b.rect(40, 10, 10, 4, PColor(0xA0703C)); b.rect(42, 14, 8, 3, PColor(0x9A968E))
+            b.rect(18, 12, 2, 10, PColor(0x5A3418)); b.rect(7, 20, 27, 9, PColor(0xF2E8C8))
+            b.blit(PixelFont.render("BUILD", color: PColor(0xA83A2A), shadow: nil, align: .left), 9, 21)
+            b.outline(PColor(0x2A1408))
+            return b
+        }
+    }
+
     static func building(_ k: BuildingKind, variant: Int = 0) -> SKTexture {
         if k == .villa { return villa(variant) }
         switch k {
@@ -1034,6 +1074,36 @@ extension PropArt {
                 b.rect(6, 30, 40, 1, PColor(0xB07A40))
                 b.line(14, 2, 24, 10, PColor(0x5A5A64)); b.rect(30, 1, 8, 5, PColor(0x6A4A2A)); b.rect(31, 6, 2, 2, PColor(0x3A3A44)); b.rect(36, 6, 2, 2, PColor(0x3A3A44))
                 b.outline(PColor(0x1A1410))
+                return b
+            case .gas:
+                let b = PixelBuffer(68, 52)
+                b.rect(2, 0, 64, 2, PColor(0x000000, 60))
+                // Kiosk at the back
+                b.rect(38, 2, 26, 26, PColor(0xE8E4DC)); b.rect(42, 8, 18, 10, PColor(0x9AD8F2)); b.rect(50, 8, 1, 10, PColor(0x5A5E66))
+                b.rect(36, 28, 30, 4, PColor(0xC83A2A))
+                // Canopy on posts
+                for x in [6, 30] { b.rect(x, 2, 3, 34, PColor(0xD8D8E0)) }
+                b.rect(2, 34, 36, 8, PColor(0xC83A2A)); b.rect(2, 38, 36, 2, PColor(0xF2F0E8))
+                b.blit(PixelFont.render("GAS", color: PColor(0xFFFFFF), shadow: nil, align: .left), 13, 34)
+                // Pumps
+                for x in [12, 22] {
+                    b.rect(x, 2, 6, 14, PColor(0xF2D23A)); b.rect(x + 1, 10, 4, 4, PColor(0x2A2A34))
+                    b.rect(x + 6, 6, 1, 8, PColor(0x2A2A34))
+                }
+                b.rect(54, 30, 10, 18, PColor(0x5A5E66)); b.rect(55, 38, 8, 9, PColor(0xF2E8C8))
+                b.blit(PixelFont.render("2G", color: PColor(0xC83A2A), shadow: nil, align: .left), 56, 40)
+                b.outline(PColor(0x1A1A20))
+                return b
+            case .garage:
+                let b = PixelBuffer(68, 52)
+                b.rect(2, 0, 64, 2, PColor(0x000000, 60))
+                b.rect(4, 2, 60, 26, PColor(0xC8B8A0))
+                for y in stride(from: 4, to: 28, by: 4) { b.rect(4, y, 60, 1, PColor(0xA89880)) }
+                for row in 0..<22 { let inset = row * 10 / 22; b.rect(1 + inset, 28 + row, 66 - inset * 2, 1, row % 3 == 2 ? PColor(0x7A3A2A) : PColor(0xA85A3A)) }
+                b.rect(12, 2, 44, 20, PColor(0x5A5E66)); for y in stride(from: 4, to: 22, by: 3) { b.rect(12, y, 44, 1, PColor(0x7A7E86)) }
+                b.rect(12, 21, 44, 1, PColor(0x3A3E46))
+                b.rect(16, 22, 36, 6, PColor(0xF2E8C8)); b.blit(PixelFont.render("GARAGE", color: PColor(0xA83A2A), shadow: nil, align: .left), 17, 22)
+                b.outline(PColor(0x2A1408))
                 return b
             case .boatShed:
                 let b = PixelBuffer(68, 52)
@@ -1324,6 +1394,8 @@ final class CarNode: SKNode {
     private let trailer = SKSpriteNode()
     private let cargo = SKSpriteNode()
     private(set) var dir: Dir = .right
+    /// False while the hitched boat is out on the water; the trailer is then towed empty.
+    var boatAboard = true { didSet { if boatAboard != oldValue { setDir(dir, force: true) } } }
 
     init(car: Car) {
         self.car = car
@@ -1356,7 +1428,7 @@ final class CarNode: SKNode {
         }
         if d == .left || d == .right { body.yScale = 1 }
         trailer.isHidden = towing == nil
-        cargo.isHidden = towing == nil
+        cargo.isHidden = towing == nil || !boatAboard
         if let boat = towing {
             let back: CGFloat = d == .left ? 1 : (d == .right ? -1 : 0)
             let backY: CGFloat = d == .up ? -1 : (d == .down ? 1 : 0)

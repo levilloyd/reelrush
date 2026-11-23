@@ -19,6 +19,10 @@ A huge Stardew-style world (280×190 tiles): your **home, farm, boat shed and wo
   - Fish bite at realistic times, in their seasons and weather. Bigger fish fight harder. Fish slowly lose freshness unless refrigerated or frozen.
   - **Rods:** all-rounders (Twig → Legendary) plus specialists (Fly, Surf Caster, Deep Sea, Bayou Baitcaster, Ice) that are great in their waters and weaker elsewhere. Switch rods with **G** → ROD.
   - **Sharks:** eight sharks (Blacktip, Lemon, Leopard, Mako, Goblin, Whitetip, Tiger and the legendary Great White) roam the salt waters, but they only bite when a salt-water rod (Surf Caster or Deep Sea Rod) is equipped.
+  - **Build your home base:** the **boat shed** (40 timber + 30 stone) and the **garage** (30 timber + 50 stone) start as empty plots by your house. Walk up and press SPACE to build them. You need the boat shed before you can buy boats and the garage before you can buy cars. Cars park at the garage, and pressing SPACE there switches between the cars you own.
+  - **Trailering:** after you launch, your car tows an empty trailer. To load the boat back on, either sail up to your parked car and press **E** (you end up at the wheel), or go ashore and drive up next to the moored boat and press **E**. Re-hitching a boat at the boat shed also brings it home.
+  - **Charter passengers:** book a charter at Bait & Tackle and launch a pontoon, trawler or yacht. Your clients (one to three people, depending on who booked) climb aboard and ride along. They stand on deck with their own rods while you fish and cheer when you land one of theirs, then head home when you come ashore after finishing the charter.
+  - **Gas:** every car and boat has a gas tank that drains as you drive or sail, and towing a boat burns extra. Fill up at the **Gas Station** in town (2G per liter). The gauge appears bottom-left while you're at the wheel. With an empty tank you can only crawl along slowly.
   - **Fish Finder (1200G, Bait & Tackle → Boats):** sonar fitted to all your boats. While you're out on the water it shows fish schools around you (yellow = water your boat can reach) and the distance and direction to the nearest one.
   - **Books:** buy the bookshelf (Home Goods). Each book lists a water's fish with your live % chance of catching each one, and reading it gives a permanent fishing bonus.
 - **Boats, cars & trailers:**
@@ -60,3 +64,17 @@ A huge Stardew-style world (280×190 tiles): your **home, farm, boat shed and wo
 - `HomeScreens.swift`: house interior, chest storage, gear/wardrobe, competition board and results
 - `GameData.swift`: habitats, fish, rods, boats, clock, weather, save data
 - `Snapshot.swift`: `REELRUSH_SNAPSHOT=dir` renders every screen to PNG (for testing; doesn't save)
+- `Game.swift`: the `Game` controller, view and app delegate; `main.swift` only launches the app
+
+## Developer cheat: one of everything
+`tools/grant-all.sh` gives a save slot one of everything: every rod, boat, car and trailer, the fish finder, all gear and decor, gold tools, every home upgrade (boat shed, garage, house expansions, chests, fridge, freezer, welder), at least one of every item, one of every fish species in your chests, and full gas tanks. It doesn't add money or fill in your fish journal.
+
+```
+tools/grant-all.sh 2                 # supercharge slot 2, keeping its name and progress
+tools/grant-all.sh 3 --name TESTER   # set up slot 3 (an empty slot gets a new save)
+tools/grant-all.sh --restore 2 build/slot2-backup-<time>.json   # undo
+```
+- Quit the game first. The tool refuses to run while it's open, because the game would overwrite the change when it quits.
+- Before changing anything, it backs up the slot's current save to `build/slot<N>-backup-<time>.json`.
+- Running it again on the same slot only tops up anything missing, so items don't pile up.
+- Saves live in this Mac's preferences (`~/Library/Preferences/com.reelrush.game.plist`), not in the repo.
